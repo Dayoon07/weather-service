@@ -95,9 +95,10 @@ export default function WeatherService() {
             
             console.log(`API 요청 정보: 날짜=${baseDate}, 시간=${baseTime}, nx=${location.nx}, ny=${location.ny}, 선택된 날짜 오프셋=${selectedDate}`);
 
+            // https://www.data.go.kr/data/15084084/openapi.do
             const url = `https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst`;
             const params = new URLSearchParams({
-                serviceKey: "mMFy2mEAs9dJT6tKErrSl5qMuPVIfeWMXt0cVxzzFAYiCHKeqvQ18/bVZR1SFkvGS/Vp1ONANOXEw+FJWXh+mQ==",
+                serviceKey: process.env.REACT_APP_WEATHER_API_KEY,
                 pageNo: 1,
                 numOfRows: 1000, // 더 많은 데이터 요청 (내일, 모레 데이터 포함)
                 dataType: "JSON",

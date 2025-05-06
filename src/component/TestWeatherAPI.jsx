@@ -42,7 +42,7 @@ export default function TestWeatherAPI() {
         const urlParams = new URLSearchParams({
             serviceKey: process.env.REACT_APP_WEATHER_API_KEY,
             pageNo: 1,
-            numOfRows: 50, // 테스트용으로 적은 수만 요청
+            numOfRows: 10, // 테스트용으로 적은 수만 요청
             dataType: "JSON",
             base_date: params.baseDate,
             base_time: params.baseTime,
