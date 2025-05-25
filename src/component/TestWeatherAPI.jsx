@@ -38,7 +38,7 @@ export default function TestWeatherAPI() {
         // https://www.data.go.kr/data/15084084/openapi.do
         const url = `https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst`;
         const urlParams = new URLSearchParams({
-            serviceKey: "mMFy2mEAs9dJT6tKErrSl5qMuPVIfeWMXt0cVxzzFAYiCHKeqvQ18/bVZR1SFkvGS/Vp1ONANOXEw+FJWXh+mQ==",
+            serviceKey: process.env.REACT_APP_API_KEY,
             pageNo: 1,
             numOfRows: 10, // 테스트용으로 적은 수만 요청
             dataType: "JSON",
