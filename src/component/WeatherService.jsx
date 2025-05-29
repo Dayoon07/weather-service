@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import Chart from "chart.js/auto";
 import "./WeatherService.css"; // 스타일시트 추가
 
 export default function WeatherService() {
@@ -8,6 +9,213 @@ export default function WeatherService() {
     const [error, setError] = useState(null);
     const [location, setLocation] = useState({ name: "서울특별시 중구 (시청)", nx: 60, ny: 127 });
     const [selectedDate, setSelectedDate] = useState(0); // 오늘부터 +0, +1, +2일
+
+    const [showChart, setShowChart] = useState(false); // 차트 표시 토글
+    
+    // Chart.js 관련 ref
+    const tempChartRef = useRef(null);
+    const humidityChartRef = useRef(null);
+    const tempChartInstance = useRef(null);
+    const humidityChartInstance = useRef(null);
+
+    // 2. 차트 생성 함수들 추가
+    const createTemperatureChart = (data) => {
+        if (tempChartInstance.current) {
+            tempChartInstance.current.destroy();
+        }
+
+        const ctx = tempChartRef.current.getContext('2d');
+        const filteredData = data.filter(item => item.date === formatDate(selectedDate));
+        
+        const labels = filteredData.map(item => formatDisplayTime(item.time));
+        const temperatures = filteredData.map(item => parseInt(item.items.TMP) || 0);
+        const precipitations = filteredData.map(item => parseInt(item.items.POP) || 0);
+
+        tempChartInstance.current = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: '기온 (°C)',
+                        data: temperatures,
+                        borderColor: 'rgb(255, 99, 132)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        yAxisID: 'y',
+                        tension: 0.4,
+                        fill: false
+                    },
+                    {
+                        label: '강수확률 (%)',
+                        data: precipitations,
+                        borderColor: 'rgb(54, 162, 235)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        yAxisID: 'y1',
+                        tension: 0.4,
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: `${location.name} - 기온 및 강수확률 (${getDisplayDate(selectedDate)})`
+                    },
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: '시간'
+                        }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: '기온 (°C)'
+                        },
+                        grid: {
+                            drawOnChartArea: false,
+                        },
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: '강수확률 (%)'
+                        },
+                        min: 0,
+                        max: 100,
+                        grid: {
+                            drawOnChartArea: false,
+                        },
+                    }
+                }
+            }
+        });
+    };
+
+    const createHumidityChart = (data) => {
+        if (humidityChartInstance.current) {
+            humidityChartInstance.current.destroy();
+        }
+
+        const ctx = humidityChartRef.current.getContext('2d');
+        const filteredData = data.filter(item => item.date === formatDate(selectedDate));
+        
+        const labels = filteredData.map(item => formatDisplayTime(item.time));
+        const humidity = filteredData.map(item => parseInt(item.items.REH) || 0);
+        const windSpeed = filteredData.map(item => parseFloat(item.items.WSD) || 0);
+
+        humidityChartInstance.current = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: '습도 (%)',
+                        data: humidity,
+                        backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: '풍속 (m/s)',
+                        data: windSpeed,
+                        type: 'line',
+                        borderColor: 'rgb(255, 205, 86)',
+                        backgroundColor: 'rgba(255, 205, 86, 0.2)',
+                        yAxisID: 'y1',
+                        tension: 0.4,
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: `${location.name} - 습도 및 풍속 (${getDisplayDate(selectedDate)})`
+                    },
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: '시간'
+                        }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: '습도 (%)'
+                        },
+                        min: 0,
+                        max: 100
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: '풍속 (m/s)'
+                        },
+                        min: 0,
+                        grid: {
+                            drawOnChartArea: false,
+                        },
+                    }
+                }
+            }
+        });
+    };
+
+    // 3. 차트 업데이트 useEffect 추가
+    useEffect(() => {
+        if (showChart && processedData && processedData.length > 0) {
+            setTimeout(() => {
+                createTemperatureChart(processedData);
+                createHumidityChart(processedData);
+            }, 100);
+        }
+        
+        // cleanup 함수
+        return () => {
+            if (tempChartInstance.current) {
+                tempChartInstance.current.destroy();
+            }
+            if (humidityChartInstance.current) {
+                humidityChartInstance.current.destroy();
+            }
+        };
+    }, [showChart, processedData, selectedDate, location]);
 
     // 날짜 포맷팅 함수
     const formatDate = (dateOffset = 0) => {
@@ -19,22 +227,23 @@ export default function WeatherService() {
         return `${year}${month}${day}`;
     };
 
-    // 시간 포맷팅 함수
+    // 시간 포맷팅 함수 개선 - 더 정확한 시간 계산
     const formatTime = () => {
         const now = new Date();
-        // 기상청 API가 지원하는 발표시각: 0200, 0500, 0800, 1100, 1400, 1700, 2000, 2300
         const availableTimes = ["0200", "0500", "0800", "1100", "1400", "1700", "2000", "2300"];
-        const hour = now.getHours();
+        const currentHour = now.getHours() * 100 + now.getMinutes(); // HHMM 형태로 변환
         
         // 현재 시간보다 이전의 가장 최근 발표시각 찾기
         for (let i = availableTimes.length - 1; i >= 0; i--) {
-            if (parseInt(availableTimes[i].substring(0, 2)) <= hour) {
+            if (parseInt(availableTimes[i]) <= currentHour) {
                 return availableTimes[i];
             }
         }
-        // 당일 첫 발표시각보다 이른 시간이면 마지막 발표시각 반환
-        return availableTimes[availableTimes.length - 1];
+        
+        // 당일 첫 발표시각보다 이른 시간이면 전날의 마지막 발표시각
+        return "2300";
     };
+
 
     // 기상 카테고리 이름 변환
     const getCategoryName = (category) => {
@@ -73,27 +282,57 @@ export default function WeatherService() {
     };
 
     // 날씨 아이콘 선택 함수
+    // const getWeatherIcon = (sky, pty) => {
+    //     if (pty !== "0") {
+    //         if (pty === "1" || pty === "4") return "🌧️";
+    //         if (pty === "2") return "🌨️";
+    //         if (pty === "3") return "❄️";
+    //     } else {
+    //         if (sky === "1") return "☀️";
+    //         if (sky === "3") return "⛅";
+    //         if (sky === "4") return "☁️";
+    //     }
+    //     return "🌈";
+    // };
+
     const getWeatherIcon = (sky, pty) => {
-        if (pty !== "0") {
+        // 강수형태가 있는 경우 우선
+        if (pty && pty !== "0") {
             if (pty === "1" || pty === "4") return "🌧️";
             if (pty === "2") return "🌨️";
             if (pty === "3") return "❄️";
-        } else {
+        }
+        
+        // 강수가 없는 경우 하늘상태로 판단
+        if (sky) {
             if (sky === "1") return "☀️";
             if (sky === "3") return "⛅";
             if (sky === "4") return "☁️";
         }
-        return "🌈";
+        
+        return "🌤️"; // 기본값 변경
     };
 
     useEffect(() => {
         async function fetchWeather() {
             setLoading(true);
-            setError(null); // 에러 상태 초기화
-            const baseDate = formatDate(0); // API 요청은 항상 오늘 기준
-            const baseTime = formatTime();
+            setError(null);
             
-            console.log(`API 요청 정보: 날짜=${baseDate}, 시간=${baseTime}, nx=${location.nx}, ny=${location.ny}, 선택된 날짜 오프셋=${selectedDate}`);
+            // API 요청 시 적절한 base_date와 base_time 계산
+            const now = new Date();
+            const currentTime = formatTime();
+            let baseDate = formatDate(0);
+            
+            // 만약 현재 시간이 0200보다 이르면 전날 데이터를 기준으로 함
+            if (now.getHours() < 2) {
+                const yesterday = new Date(now);
+                yesterday.setDate(yesterday.getDate() - 1);
+                baseDate = yesterday.getFullYear() + 
+                        String(yesterday.getMonth() + 1).padStart(2, '0') + 
+                        String(yesterday.getDate()).padStart(2, '0');
+            }
+            
+            console.log(`API 요청 정보: 날짜=${baseDate}, 시간=${currentTime}, nx=${location.nx}, ny=${location.ny}, 선택된 날짜 오프셋=${selectedDate}`);
 
             // https://www.data.go.kr/data/15084084/openapi.do
             const url = `https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst`;
@@ -103,7 +342,7 @@ export default function WeatherService() {
                 numOfRows: 1000, // 더 많은 데이터 요청 (내일, 모레 데이터 포함)
                 dataType: "JSON",
                 base_date: baseDate,
-                base_time: baseTime,
+                base_time: currentTime,
                 nx: location.nx,
                 ny: location.ny
             });
@@ -112,33 +351,37 @@ export default function WeatherService() {
                 const response = await fetch(`${url}?${params}`);
                 
                 if (!response.ok) {
-                    throw new Error(`HTTP 오류: ${response.status}`);
+                    throw new Error(`HTTP 오류: ${response.status} - ${response.statusText}`);
                 }
                 
                 const data = await response.json();
                 
-                // API 응답 구조 확인 및 오류 처리
-                if (data && data.response && data.response.body && 
-                    data.response.body.items && data.response.body.items.item) {
-                    const items = data.response.body.items.item;
-                    setWeatherData(items);
+                // API 응답 구조 확인 및 오류 처리 강화
+                if (data?.response?.header?.resultCode !== "00") {
+                    throw new Error(`API 오류: ${data?.response?.header?.resultMsg || '알 수 없는 오류'}`);
+                }
+                
+                if (data?.response?.body?.items?.item) {
+                    // 단일 항목도 배열로 처리
+                    const items = Array.isArray(data.response.body.items.item) 
+                        ? data.response.body.items.item 
+                        : [data.response.body.items.item];
                     
-                    // 데이터 가공
+                    setWeatherData(items);
                     processWeatherData(items);
                 } else {
-                    console.error("API 응답 구조가 예상과 다릅니다:", data);
-                    setError("날씨 데이터 형식이 올바르지 않습니다.");
+                    throw new Error("날씨 데이터를 찾을 수 없습니다.");
                 }
             } catch (err) {
-                console.error(err);
-                setError("날씨 데이터를 불러오는 데 실패했습니다.");
+                console.error("API 요청 오류:", err);
+                setError(`날씨 데이터를 불러오는 데 실패했습니다: ${err.message}`);
             } finally {
                 setLoading(false);
             }
         }
 
         fetchWeather();
-    }, [location, selectedDate]);
+    }, [location]); // selectedDate 의존성 제거 - 클라이언트에서 필터링
 
     // 날씨 데이터 가공
     const processWeatherData = (items) => {
@@ -146,21 +389,11 @@ export default function WeatherService() {
             setProcessedData([]);
             return;
         }
-    
-        // 선택된 날짜에 해당하는 데이터만 필터링
-        const targetDate = formatDate(selectedDate);
-        const filteredItems = items.filter(item => item.fcstDate === targetDate);
-        
-        if (filteredItems.length === 0) {
-            console.log(`${targetDate}에 해당하는 날씨 데이터가 없습니다.`);
-            setProcessedData([]);
-            return;
-        }
-    
+
         // 날짜와 시간별로 그룹화
         const groupedData = {};
         
-        filteredItems.forEach(item => {
+        items.forEach(item => {
             const key = `${item.fcstDate}-${item.fcstTime}`;
             if (!groupedData[key]) {
                 groupedData[key] = {
@@ -171,15 +404,15 @@ export default function WeatherService() {
             }
             groupedData[key].items[item.category] = item.fcstValue;
         });
-    
-        // 시간순으로 정렬된 배열로 변환
+
+        // 모든 시간대 데이터를 정렬된 배열로 변환 (날짜 필터링 제거)
         const sortedData = Object.values(groupedData).sort((a, b) => {
             if (a.date === b.date) {
                 return a.time.localeCompare(b.time);
             }
             return a.date.localeCompare(b.date);
         });
-    
+
         setProcessedData(sortedData);
     };
 
@@ -368,25 +601,36 @@ export default function WeatherService() {
                     </select>
                 </div>
                 
-                <div className="date-selector">
-                    <button 
-                        className={selectedDate === 0 ? 'active' : ''} 
-                        onClick={() => handleDateChange(0)}
-                    >
-                        오늘
-                    </button>
-                    <button 
-                        className={selectedDate === 1 ? 'active' : ''} 
-                        onClick={() => handleDateChange(1)}
-                    >
-                        내일
-                    </button>
-                    <button 
-                        className={selectedDate === 2 ? 'active' : ''} 
-                        onClick={() => handleDateChange(2)}
-                    >
-                        모레
-                    </button>
+                <div className="selector-and-toggle-btn">
+                    <div className="date-selector">
+                        <button 
+                            className={selectedDate === 0 ? 'active' : ''} 
+                            onClick={() => handleDateChange(0)}
+                        >
+                            오늘
+                        </button>
+                        <button 
+                            className={selectedDate === 1 ? 'active' : ''} 
+                            onClick={() => handleDateChange(1)}
+                        >
+                            내일
+                        </button>
+                        <button 
+                            className={selectedDate === 2 ? 'active' : ''} 
+                            onClick={() => handleDateChange(2)}
+                        >
+                            모레
+                        </button>
+                    </div>
+
+                    <div className="chart-toggle">
+                        <button 
+                            className={showChart ? 'active chart-btn' : 'chart-btn'} 
+                            onClick={() => setShowChart(!showChart)}
+                        >
+                            {showChart ? ' 차트 숨기기' : '차트 보기'}
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -395,36 +639,47 @@ export default function WeatherService() {
             ) : processedData && processedData.length > 0 ? (
                 <div className="weather-container">
                     <h2>{location.name} 날씨 {getDisplayDate(selectedDate)}</h2>
+
+                    {/* 새로 추가: 차트 섹션 */}
+                    {showChart && (
+                        <div className="charts-container">
+                            <div className="chart-wrapper">
+                                <canvas ref={tempChartRef} id="temperatureChart"></canvas>
+                            </div>
+                            <div className="chart-wrapper">
+                                <canvas ref={humidityChartRef} id="humidityChart"></canvas>
+                            </div>
+                        </div>
+                    )}
                     
                     <div className="weather-cards">
-                        {processedData.map((timeSlot, index) => {
-                            const skyValue = timeSlot.items.SKY;
-                            const ptyValue = timeSlot.items.PTY;
-                            const tempValue = timeSlot.items.TMP;
-                            const popValue = timeSlot.items.POP;
-                            const rehValue = timeSlot.items.REH;
-                            
-                            // 필수 데이터가 없으면 카드를 표시하지 않음
-                            if (!skyValue || !ptyValue || !tempValue) {
-                                return null;
-                            }
-                            
-                            return (
-                                <div className="weather-card" key={index}>
-                                    <div className="time">{formatDisplayTime(timeSlot.time)}</div>
-                                    <div className="icon">{getWeatherIcon(skyValue, ptyValue)}</div>
-                                    <div className="temp">{tempValue}°C</div>
-                                    <div className="condition">{interpretWeather('SKY', skyValue)}</div>
-                                    <div className="details">
-                                        <div>강수확률: {popValue ? popValue : '0'}%</div>
-                                        <div>습도: {rehValue ? rehValue : '0'}%</div>
+                        {processedData
+                            .filter(timeSlot => timeSlot.date === formatDate(selectedDate)) // 클라이언트 필터링
+                            .map((timeSlot, index) => {
+                                const skyValue = timeSlot.items.SKY;
+                                const ptyValue = timeSlot.items.PTY || "0"; // 기본값 설정
+                                const tempValue = timeSlot.items.TMP;
+                                const popValue = timeSlot.items.POP || "0"; // 기본값 설정
+                                const rehValue = timeSlot.items.REH || "0"; // 기본값 설정
+                                
+                                // 필수 데이터가 없으면 카드를 표시하지 않음
+                                if (!skyValue || !tempValue) {
+                                    return null;
+                                }
+                                
+                                return (
+                                    <div className="weather-card" key={`${timeSlot.date}-${timeSlot.time}`}>
+                                        <div className="time">{formatDisplayTime(timeSlot.time)}</div>
+                                        <div className="icon">{getWeatherIcon(skyValue, ptyValue)}</div>
+                                        <div className="temp">{tempValue}°C</div>
+                                        <div className="condition">{interpretWeather('SKY', skyValue)}</div>
+                                        <div className="details">
+                                            <div>강수확률: {popValue}%</div>
+                                            <div>습도: {rehValue}%</div>
+                                        </div>
                                     </div>
-                                </div>
-                            );
-                        })}
-                        {processedData.length === 0 && (
-                            <div className="no-data">선택한 날짜의 날씨 데이터가 없습니다.</div>
-                        )}
+                                );
+                            })}
                     </div>
                 </div>
             ) : (
